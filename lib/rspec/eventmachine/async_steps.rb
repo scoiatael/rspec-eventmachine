@@ -6,10 +6,9 @@ module RSpec::EM
     end
     
     def method_added(method_name)
-      async_method_name = "async_#{method_name}"
+      async_method_name = async_method_name(method_name)
 
-      return if instance_methods(false).map { |m| m.to_s }.include?(async_method_name) or
-                method_name.to_s =~ /^async_/
+      return if ignored_method(method_name)
 
       module_eval <<-RUBY, __FILE__, __LINE__ + 1
         alias :#{async_method_name} :#{method_name}
@@ -18,6 +17,20 @@ module RSpec::EM
           __enqueue__([#{async_method_name.inspect}] + args)
         end
       RUBY
+    end
+
+    def async_method_name(method_name)
+      "async_#{method_name}"
+    end
+
+    def ignored_method(method_name, regex = nil, alternative_name = nil)
+      regex ||= /^async_/
+      alternative_name ||= async_method_name(method_name)
+
+      instance_methods(false)
+        .map(&:to_s)
+        .include?(alternative_name) ||
+        method_name.to_s =~ regex
     end
     
     module Scheduler
